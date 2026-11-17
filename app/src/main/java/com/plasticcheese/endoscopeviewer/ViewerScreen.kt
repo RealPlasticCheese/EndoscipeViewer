@@ -14,10 +14,13 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -69,7 +72,8 @@ internal fun ViewerScreen(session: CameraSession, onCameraPermission: () -> Unit
     var saving by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<CameraPreview?>(null) }
     val transform = PreviewTransform(turns, mirrored, zoom)
-    val streaming = session.status == CameraStatus.Streaming
+    val status = session.status
+    val streaming = status == CameraStatus.Streaming
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -95,7 +99,7 @@ internal fun ViewerScreen(session: CameraSession, onCameraPermission: () -> Unit
                 )
             } else {
                 CameraMessage(
-                    status = session.status,
+                    status = status,
                     onCameraPermission = onCameraPermission,
                     onRetry = session::retry,
                 )
@@ -133,7 +137,7 @@ internal fun ViewerScreen(session: CameraSession, onCameraPermission: () -> Unit
                         WindowInsets.displayCutout.union(WindowInsets.systemGestures),
                     ).padding(8.dp),
                 )
-            } else if (session.status == CameraStatus.Failed && session.resolutions.isNotEmpty()) {
+            } else if (status == CameraStatus.Failed && session.resolutions.isNotEmpty()) {
                 ResolutionPicker(
                     session,
                     Modifier.align(Alignment.BottomCenter).windowInsetsPadding(
@@ -259,18 +263,24 @@ private fun CameraMessage(status: CameraStatus, onCameraPermission: () -> Unit, 
     Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier.windowInsetsPadding(WindowInsets.displayCutout)
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 24.dp, vertical = 12.dp),
             contentAlignment = Alignment.Center,
         ) {
             Column(
-                modifier = Modifier.widthIn(max = 320.dp),
+                modifier = Modifier.widthIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (status == CameraStatus.Connecting) CircularProgressIndicator()
+                if (status != CameraStatus.Failed) SplashBranding()
+                if (status == CameraStatus.Connecting) CircularProgressIndicator(Modifier.size(24.dp))
                 Text(
                     stringResource(title),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = if (status == CameraStatus.Failed) {
+                        MaterialTheme.typography.headlineSmall
+                    } else {
+                        MaterialTheme.typography.titleMedium
+                    },
                     textAlign = TextAlign.Center,
                 )
                 message?.let {
