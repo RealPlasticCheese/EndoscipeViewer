@@ -1,0 +1,97 @@
+name: Android build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: gradle/actions/wrapper-validation@v6.4.1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: android-actions/setup-android@v4.0.4
+        with:
+          packages: 'platforms;android-36 build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+      - name: Build and test
+        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: endoscope-viewer-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+  publish:
+    if: github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-24.04
+    environment: production
+    concurrency:
+      group: endoscope-viewer-pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: android-actions/setup-android@v4.0.4
+        with:
+          packages: 'platforms;android-36 build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+      - name: Build and verify the signed APK
+        env:
+          APK_KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
+          APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+          APK_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+          APK_KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
+          EXPECTED_CERT_SHA256: ${{ vars.APK_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          : "${APK_KEYSTORE_BASE64:?Missing keystore}" "${APK_KEYSTORE_PASSWORD:?Missing keystore password}"
+          : "${APK_KEY_ALIAS:?Missing key alias}" "${APK_KEY_PASSWORD:?Missing key password}"
+          : "${EXPECTED_CERT_SHA256:?Missing signing certificate fingerprint}"
+          export APK_KEYSTORE_FILE="$RUNNER_TEMP/endoscope-release.p12"
+          export APK_VERSION_CODE=$((GITHUB_RUN_NUMBER + 1))
+          trap 'rm -f "$APK_KEYSTORE_FILE"' EXIT
+          umask 077
+          printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > "$APK_KEYSTORE_FILE"
+
+          ./gradlew :app:assembleRelease
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk dist/endoscope-viewer.apk
+          sdk_tools="$ANDROID_HOME/build-tools/36.0.0"
+          "$sdk_tools/zipalign" -c -P 16 4 dist/endoscope-viewer.apk
+          permissions=$("$sdk_tools/aapt" dump permissions dist/endoscope-viewer.apk)
+          if grep -q 'android.permission.INTERNET' <<< "$permissions"; then
+            echo 'The APK requests internet access.' >&2
+            exit 1
+          fi
+          certificate=$("$sdk_tools/apksigner" verify --print-certs dist/endoscope-viewer.apk)
+          actual=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' <<< "$certificate")
+          if [[ "${actual,,}" != "${EXPECTED_CERT_SHA256,,}" ]]; then
+            echo 'The APK signing certificate differs from the configured certificate.' >&2
+            exit 1
+          fi
+
+          printf '%s\n' "$APK_VERSION_CODE" > dist/version-code.txt
+          (cd dist && sha256sum endoscope-viewer.apk > endoscope-viewer.apk.sha256)
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: endoscope-viewer-signed
+          path: dist/
+      - name: Publish APK to the Pages repository
+        env:
+          PAGES_DEPLOY_KEY: ${{ secrets.PAGES_DEPLOY_KEY }}
+        run: bash scripts/publish-apk.sh dist
