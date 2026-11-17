@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">Endoscope Viewer</string>
+    <string name="connect_camera">Connect a USB camera</string>
+    <string name="connect_help">Plug a UVC endoscope or webcam into your phone’s USB port using a data-capable OTG adapter if needed.</string>
+    <string name="connecting">Connecting to camera…</string>
+    <string name="camera_permission">Allow camera access</string>
+    <string name="camera_permission_help">Android requires camera access to use a USB video device.</string>
+    <string name="continue_permission">Continue</string>
+    <string name="usb_permission">Allow USB access</string>
+    <string name="usb_permission_help">Tap Retry and allow access to the connected USB camera.</string>
+    <string name="camera_failed">Camera preview unavailable</string>
+    <string name="camera_failed_help">Try again or reconnect the camera. You may also be able to select a lower resolution.</string>
+    <string name="retry">Retry</string>
+    <string name="rotate">Rotate</string>
+    <string name="mirror">Mirror</string>
+    <string name="capture">Photo</string>
+    <string name="resolution">Resolution</string>
+    <string name="dimensions">%1$d × %2$d</string>
+    <string name="zoom">Digital zoom</string>
+    <string name="zoom_value">%1$.1f×</string>
+    <string name="show_controls">Show controls</string>
+    <string name="hide_controls">Hide controls</string>
+    <string name="photo_saved">Photo saved to Gallery</string>
+    <string name="photo_failed">Couldn’t save the photo</string>
+</resources>

@@ -1,0 +1,11 @@
+/.gradle/
+/.kotlin/
+/.idea/
+/local.properties
+**/build/
+*.iml
+*.jks
+*.keystore
+*.p12
+/endoscope-pages-deploy
+/endoscope-pages-deploy.pub
