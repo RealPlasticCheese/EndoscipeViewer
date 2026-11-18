@@ -233,12 +233,12 @@ private fun ResolutionPicker(session: CameraSession, modifier: Modifier = Modifi
 
 @Composable
 private fun CameraMessage(status: CameraStatus, onCameraPermission: () -> Unit, onRetry: () -> Unit) {
-    @StringRes val title: Int
+    @StringRes val title: Int?
     @StringRes var message: Int? = null
     @StringRes var button: Int? = null
     when (status) {
         CameraStatus.Disconnected -> {
-            title = R.string.connect_camera
+            title = null
             message = R.string.connect_help
         }
         CameraStatus.Connecting -> title = R.string.connecting
@@ -272,17 +272,26 @@ private fun CameraMessage(status: CameraStatus, onCameraPermission: () -> Unit, 
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (status != CameraStatus.Failed) SplashBranding()
-                if (status == CameraStatus.Connecting) CircularProgressIndicator(Modifier.size(24.dp))
-                Text(
-                    stringResource(title),
-                    style = if (status == CameraStatus.Failed) {
-                        MaterialTheme.typography.headlineSmall
+                if (status != CameraStatus.Failed) {
+                    val imageModifier = if (status == CameraStatus.Disconnected) {
+                        Modifier.widthIn(max = 264.dp).fillMaxWidth()
                     } else {
-                        MaterialTheme.typography.titleMedium
-                    },
-                    textAlign = TextAlign.Center,
-                )
+                        Modifier.size(112.dp)
+                    }
+                    SplashBranding(imageModifier)
+                }
+                if (status == CameraStatus.Connecting) CircularProgressIndicator(Modifier.size(24.dp))
+                title?.let {
+                    Text(
+                        stringResource(it),
+                        style = if (status == CameraStatus.Failed) {
+                            MaterialTheme.typography.headlineSmall
+                        } else {
+                            MaterialTheme.typography.titleMedium
+                        },
+                        textAlign = TextAlign.Center,
+                    )
+                }
                 message?.let {
                     Text(
                         text = stringResource(it),

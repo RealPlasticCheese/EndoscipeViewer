@@ -3,7 +3,7 @@
     <string name="website_label" translatable="false">plasticcheese.com</string>
     <string name="website_url" translatable="false">https://plasticcheese.com/home/</string>
     <string name="website_open_failed">Couldn’t open the website</string>
-    <string name="connect_camera">Connect a USB camera</string>
+    <string name="welcome_title">Endoscope Viewer</string>
     <string name="connect_help">Plug a UVC endoscope or webcam into your phone’s USB port using a data-capable OTG adapter if needed.</string>
     <string name="connecting">Connecting to camera…</string>
     <string name="camera_permission">Allow camera access</string>
