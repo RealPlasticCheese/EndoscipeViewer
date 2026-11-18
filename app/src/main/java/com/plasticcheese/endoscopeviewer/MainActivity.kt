@@ -39,17 +39,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val capture = capturePhoto
-        val shutterKey = event.keyCode == KeyEvent.KEYCODE_CAMERA ||
-            event.keyCode == KeyEvent.KEYCODE_VOLUME_UP
-        if (shutterKey && capture != null && session.status == CameraStatus.Streaming) {
-            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                capture()
-            }
-            return true
-        }
-        return super.dispatchKeyEvent(event)
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val capture = activeShutterAction(keyCode) ?: return super.onKeyDown(keyCode, event)
+        if (event.repeatCount == 0) capture()
+        return true
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (activeShutterAction(keyCode) != null) return true
+        return super.onKeyUp(keyCode, event)
+    }
+
+    private fun activeShutterAction(keyCode: Int): (() -> Unit)? {
+        val capture = capturePhoto ?: return null
+        val shutterKey = keyCode == KeyEvent.KEYCODE_CAMERA || keyCode == KeyEvent.KEYCODE_VOLUME_UP
+        return capture.takeIf { shutterKey && session.status == CameraStatus.Streaming }
     }
 
     override fun onStart() {
