@@ -1,11 +1,11 @@
-# Endoscope Viewer
+# PlasticCheese Endoscope Viewer
 
 An offline Android viewer for USB-C OTG endoscopes and other USB Video Class (UVC) cameras. It shows a full-screen live feed, discovers the camera’s resolutions, and saves JPEG photos to Gallery. The app uses Kotlin, Jetpack Compose Material 3, and [UVCAndroid](https://github.com/shiyinghan/UVCAndroid).
 
 ## Install and use
 
 1. Download the signed APK from the [project page](https://plasticcheese.com/endoscopeviewer/). Open it on the phone and allow your browser or file manager to install it when Android prompts. A SHA-256 checksum is available next to the APK.
-2. Open Endoscope Viewer and plug in a UVC camera. Use a data-capable OTG adapter if the camera does not plug directly into the phone. Approve Android’s Camera and USB access prompts.
+2. Open PlasticCheese Endoscope Viewer and plug in a UVC camera. The splash screen appears while the app waits for the camera. Tap **plasticcheese.com** to open the homepage in your browser. Use a data-capable OTG adapter if the camera does not plug directly into the phone. Approve Android’s Camera and USB access prompts.
 3. Tap the picture to hide or show controls. Use **Rotate**, **Mirror**, the zoom slider or pinch, and the resolution picker. Tap **Photo** to save the current view under **Pictures / Endoscope Viewer**. Rotation, mirroring and zoom are included in the JPEG.
 4. Unplug and reconnect the camera to resume viewing or switch to another camera.
 
@@ -68,12 +68,12 @@ The workflow publishes the APK, its checksum, and its version code under `endosc
 
 Try the following on the target phone before relying on a particular camera.
 
-- Connect with the app already open, and connect again with the app closed.
+- Open the app with the camera unplugged. Verify that the splash screen appears and that **plasticcheese.com** opens the homepage in your default browser. Connect with the app already open, and connect again with the app closed.
 - Deny USB permission, tap **Retry**, then allow it. Verify the preview appears.
 - Change resolutions, rotate, mirror and zoom. Hide the controls and save a photo after bringing them back. Inspect the saved photo in Gallery.
-- Unplug and reconnect the camera while streaming, then try a second UVC camera. Verify that the picker reflects the second camera’s modes.
+- Unplug and reconnect the camera while streaming. Verify that the splash screen returns while the camera is unplugged. Try a second UVC camera and verify that the picker reflects its modes.
 - Lock and unlock the phone, then leave and return to the app. Verify streaming resumes.
 
-## Third-party notices
+## License
 
-See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the native camera libraries and their sources.
+PlasticCheese Endoscope Viewer is licensed under the [MIT License](LICENSE). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the native camera libraries, their licenses, and their sources.
