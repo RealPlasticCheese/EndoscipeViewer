@@ -37,6 +37,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -44,6 +45,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -73,7 +75,11 @@ private val viewerColors = darkColorScheme(
 )
 
 @Composable
-internal fun ViewerScreen(session: CameraSession, onCameraPermission: () -> Unit) {
+internal fun ViewerScreen(
+    session: CameraSession,
+    onCameraPermission: () -> Unit,
+    setHardwareShutterAction: ((() -> Unit)?) -> Unit,
+) {
     var turns by rememberSaveable { mutableIntStateOf(0) }
     var mirrored by rememberSaveable { mutableStateOf(false) }
     var zoom by rememberSaveable { mutableFloatStateOf(1f) }
@@ -96,6 +102,35 @@ internal fun ViewerScreen(session: CameraSession, onCameraPermission: () -> Unit
                 Toast.makeText(context, R.string.photo_open_failed, Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    fun capturePhoto() {
+        if (saving || session.status != CameraStatus.Streaming) return
+        val photo = preview?.snapshot()
+        if (photo == null) {
+            Toast.makeText(context, R.string.photo_failed, Toast.LENGTH_SHORT).show()
+        } else {
+            saving = true
+            scope.launch {
+                try {
+                    val saved = withContext(Dispatchers.IO) {
+                        runCatching { savePhoto(context.contentResolver, photo) }.isSuccess
+                    }
+                    if (saved) photoRefresh++
+                    val message = if (saved) R.string.photo_saved else R.string.photo_failed
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                } finally {
+                    photo.recycle()
+                    saving = false
+                }
+            }
+        }
+    }
+
+    val currentCapturePhoto by rememberUpdatedState(::capturePhoto)
+    DisposableEffect(setHardwareShutterAction) {
+        setHardwareShutterAction { currentCapturePhoto() }
+        onDispose { setHardwareShutterAction(null) }
     }
 
     val toggleLabel = stringResource(
@@ -137,27 +172,7 @@ internal fun ViewerScreen(session: CameraSession, onCameraPermission: () -> Unit
                     onRotate = { turns = (turns + 1) % 4 },
                     onMirror = { mirrored = !mirrored },
                     onZoom = { zoom = it },
-                    onPhoto = {
-                        val photo = preview?.snapshot()
-                        if (photo == null) {
-                            Toast.makeText(context, R.string.photo_failed, Toast.LENGTH_SHORT).show()
-                        } else {
-                            saving = true
-                            scope.launch {
-                                try {
-                                    val saved = withContext(Dispatchers.IO) {
-                                        runCatching { savePhoto(context.contentResolver, photo) }.isSuccess
-                                    }
-                                    if (saved) photoRefresh++
-                                    val message = if (saved) R.string.photo_saved else R.string.photo_failed
-                                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                                } finally {
-                                    photo.recycle()
-                                    saving = false
-                                }
-                            }
-                        }
-                    },
+                    onPhoto = ::capturePhoto,
                     modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(
                         WindowInsets.displayCutout.union(WindowInsets.systemGestures),
                     ).padding(8.dp),

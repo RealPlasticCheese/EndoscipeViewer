@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
+import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,6 +18,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 
 class MainActivity : ComponentActivity() {
     private lateinit var session: CameraSession
+    private var capturePhoto: (() -> Unit)? = null
     private var permissionPending = false
     private var permissionAsked = false
     private val requestCamera = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -32,7 +34,26 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         session = CameraSession(applicationContext, ::hasCameraPermission, ::requestCameraAutomatically)
-        setContent { ViewerScreen(session, ::showCameraPermission) }
+        setContent {
+            ViewerScreen(session, ::showCameraPermission) { capturePhoto = it }
+        }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val capture = activeShutterAction(keyCode) ?: return super.onKeyDown(keyCode, event)
+        if (event.repeatCount == 0) capture()
+        return true
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (activeShutterAction(keyCode) != null) return true
+        return super.onKeyUp(keyCode, event)
+    }
+
+    private fun activeShutterAction(keyCode: Int): (() -> Unit)? {
+        val capture = capturePhoto ?: return null
+        val shutterKey = keyCode == KeyEvent.KEYCODE_CAMERA || keyCode == KeyEvent.KEYCODE_VOLUME_UP
+        return capture.takeIf { shutterKey && session.status == CameraStatus.Streaming }
     }
 
     override fun onStart() {
