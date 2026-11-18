@@ -25,4 +25,7 @@
     <string name="hide_controls">Hide controls</string>
     <string name="photo_saved">Photo saved to Gallery</string>
     <string name="photo_failed">Couldn’t save the photo</string>
+    <string name="view_latest_photo">View latest photo</string>
+    <string name="view_photo_short">View</string>
+    <string name="photo_open_failed">Couldn’t open the photo</string>
 </resources>

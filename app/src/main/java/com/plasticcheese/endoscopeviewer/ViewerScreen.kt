@@ -1,13 +1,16 @@
 package com.plasticcheese.endoscopeviewer
 
+import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.annotation.StringRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
@@ -27,6 +30,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -37,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -44,7 +49,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -52,6 +59,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -76,6 +85,18 @@ internal fun ViewerScreen(session: CameraSession, onCameraPermission: () -> Unit
     val streaming = status == CameraStatus.Streaming
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var photoRefresh by remember { mutableIntStateOf(0) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { photoRefresh++ }
+    val latestPhoto by produceState<SavedPhoto?>(null, photoRefresh) {
+        value = withContext(Dispatchers.IO) { findLatestPhoto(context.contentResolver) }
+    }
+    val openLatestPhoto: (() -> Unit)? = latestPhoto?.let { photo ->
+        {
+            if (!openPhoto(context, photo.uri)) {
+                Toast.makeText(context, R.string.photo_open_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     val toggleLabel = stringResource(
         if (showControls) R.string.hide_controls else R.string.show_controls,
@@ -102,6 +123,7 @@ internal fun ViewerScreen(session: CameraSession, onCameraPermission: () -> Unit
                     status = status,
                     onCameraPermission = onCameraPermission,
                     onRetry = session::retry,
+                    onOpenPhoto = openLatestPhoto,
                 )
             }
             if (streaming && showControls) {
@@ -110,6 +132,8 @@ internal fun ViewerScreen(session: CameraSession, onCameraPermission: () -> Unit
                     mirrored = mirrored,
                     zoom = zoom,
                     saving = saving,
+                    photoThumbnail = latestPhoto?.thumbnail,
+                    onOpenPhoto = openLatestPhoto,
                     onRotate = { turns = (turns + 1) % 4 },
                     onMirror = { mirrored = !mirrored },
                     onZoom = { zoom = it },
@@ -124,6 +148,7 @@ internal fun ViewerScreen(session: CameraSession, onCameraPermission: () -> Unit
                                     val saved = withContext(Dispatchers.IO) {
                                         runCatching { savePhoto(context.contentResolver, photo) }.isSuccess
                                     }
+                                    if (saved) photoRefresh++
                                     val message = if (saved) R.string.photo_saved else R.string.photo_failed
                                     Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                                 } finally {
@@ -155,6 +180,8 @@ private fun CameraControls(
     mirrored: Boolean,
     zoom: Float,
     saving: Boolean,
+    photoThumbnail: Bitmap?,
+    onOpenPhoto: (() -> Unit)?,
     onRotate: () -> Unit,
     onMirror: () -> Unit,
     onZoom: (Float) -> Unit,
@@ -167,16 +194,39 @@ private fun CameraControls(
         shape = MaterialTheme.shapes.extraLarge,
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
+                itemVerticalAlignment = Alignment.CenterVertically,
             ) {
                 FilledTonalButton(onClick = onRotate) { Text(stringResource(R.string.rotate)) }
                 FilterChip(selected = mirrored, onClick = onMirror, label = {
                     Text(stringResource(R.string.mirror))
                 })
-                Button(onClick = onPhoto, enabled = !saving) { Text(stringResource(R.string.capture)) }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Button(onClick = onPhoto, enabled = !saving) { Text(stringResource(R.string.capture)) }
+                    if (onOpenPhoto != null) {
+                        val label = stringResource(R.string.view_latest_photo)
+                        FilledTonalIconButton(
+                            onClick = onOpenPhoto,
+                            modifier = Modifier.semantics { contentDescription = label },
+                        ) {
+                            if (photoThumbnail == null) {
+                                Text(stringResource(R.string.view_photo_short))
+                            } else {
+                                Image(
+                                    bitmap = photoThumbnail.asImageBitmap(),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(40.dp),
+                                    contentScale = ContentScale.Crop,
+                                )
+                            }
+                        }
+                    }
+                }
             }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -232,7 +282,12 @@ private fun ResolutionPicker(session: CameraSession, modifier: Modifier = Modifi
 }
 
 @Composable
-private fun CameraMessage(status: CameraStatus, onCameraPermission: () -> Unit, onRetry: () -> Unit) {
+private fun CameraMessage(
+    status: CameraStatus,
+    onCameraPermission: () -> Unit,
+    onRetry: () -> Unit,
+    onOpenPhoto: (() -> Unit)?,
+) {
     @StringRes val title: Int?
     @StringRes var message: Int? = null
     @StringRes var button: Int? = null
@@ -303,6 +358,11 @@ private fun CameraMessage(status: CameraStatus, onCameraPermission: () -> Unit, 
                 button?.let {
                     val action = if (status == CameraStatus.CameraPermission) onCameraPermission else onRetry
                     Button(onClick = action) { Text(stringResource(it)) }
+                }
+                if (status == CameraStatus.Disconnected && onOpenPhoto != null) {
+                    FilledTonalButton(onClick = onOpenPhoto) {
+                        Text(stringResource(R.string.view_latest_photo))
+                    }
                 }
             }
         }
